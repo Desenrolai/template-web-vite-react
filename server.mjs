@@ -28,14 +28,22 @@ const MIME = {
 /**
  * Caminho absoluto de um pathname de request, ou `null` se ele escapa do dist.
  *
- * Medido: o parser de `new URL` já remove segmentos `..`, inclusive na forma
- * percent-encoded (`/%2e%2e/x` chega aqui como `/x`). Ou seja, um request HTTP
- * normal não consegue trazer travessia até esta função.
+ * NÃO REMOVA a checagem de contenção. Ela é a única defesa contra um ataque que
+ * chega vivo por HTTP — não é redundância do `new URL`.
  *
- * A contenção existe como defesa em profundidade: ela vale para quem chamar a
- * função direto e para um refactor futuro que leia `req.url` sem passar por
- * `new URL`. `server.test.mjs` exercita exatamente esses caminhos, e mutar a
- * comparação abaixo derruba 3 testes.
+ * Medido, request a request, no container:
+ *   /../../etc/passwd            -> `new URL` normaliza, pathname vira /etc/passwd
+ *   /%2e%2e/%2e%2e/etc/passwd    -> `new URL` normaliza, pathname vira /etc/passwd
+ *   /..%2f..%2fetc/passwd        -> `new URL` NÃO normaliza: a barra codificada
+ *                                   impede a divisão em segmentos e o pathname
+ *                                   chega CRU até aqui
+ *
+ * Nesse terceiro caso quem barra é o `decodeURIComponent` + `path.resolve` +
+ * comparação de prefixo abaixo: o servidor responde 403. Com a comparação
+ * neutralizada para `true`, o MESMO request passou a servir /etc/passwd (200,
+ * conteúdo real do arquivo). O mesmo vale para `%2F` maiúsculo.
+ *
+ * `server.test.mjs` cobre as três formas; mutar a comparação derruba 5 testes.
  *
  * @param {string} distDir diretório servido, absoluto
  * @param {string} pathname `url.pathname` do request (começa com `/`)

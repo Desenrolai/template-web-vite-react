@@ -36,12 +36,27 @@ O forge sobe o pod com `readOnlyRootFilesystem: true` e o nginx precisa escrever
 `/var/cache/nginx`. `server.mjs` serve o `dist/` só com a stdlib do Node — sem dependência,
 sem escrita em disco, com fallback de SPA para `index.html`.
 
-Ele decodifica o pathname antes de resolver o caminho e recusa qualquer caminho resolvido
-que caia fora de `dist/`. Medido: o parser de `new URL` já remove segmentos `..` — inclusive
-percent-encoded — então por HTTP a travessia nem chega ao resolvedor; a contenção é defesa
-em profundidade para chamada direta e para refactor futuro. `server.test.mjs` cobre
-travessia crua, percent-encoded, irmão de nome parecido, encoding inválido e byte nulo, e
-mutar a comparação de contenção derruba 3 testes.
+### A checagem de contenção em `resolveWithinDist` não é redundante — não a remova
+
+`server.mjs` decodifica o pathname antes de resolver o caminho e recusa (403) qualquer
+caminho resolvido que caia fora de `dist/`. É tentador achar que o `new URL` já cobre isso.
+**Não cobre.** Medido, request a request, no container:
+
+| Request                     | O que o `new URL` faz                  | Quem barra                     |
+| --------------------------- | -------------------------------------- | ------------------------------ |
+| `/../../etc/passwd`         | normaliza → `/etc/passwd`              | o próprio `new URL`            |
+| `/%2e%2e/%2e%2e/etc/passwd` | normaliza → `/etc/passwd`              | o próprio `new URL`            |
+| `/..%2f..%2fetc/passwd`     | **não normaliza** — pathname chega cru | **só a checagem de contenção** |
+
+A barra percent-encoded (`%2f`, e `%2F`) impede a divisão em segmentos, então o parser não
+enxerga `..` para remover e o caminho chega inteiro ao resolvedor. Nesse caso o
+`decodeURIComponent` + `path.resolve` + comparação de prefixo é a **única** linha de defesa
+contra um ataque que chega vivo por HTTP.
+
+Provado nos dois sentidos: com a checagem, o request devolve **403**; com a comparação
+neutralizada para `true`, o mesmo request passou a devolver **200 com o conteúdo real de
+`/etc/passwd`**. `server.test.mjs` cobre as três formas (mais irmão de nome parecido,
+encoding inválido e byte nulo) e a mutação derruba **5 testes**.
 
 ## Pool de teste dentro de container
 

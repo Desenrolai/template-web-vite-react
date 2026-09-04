@@ -23,10 +23,22 @@ describe('resolveWithinDist', () => {
     expect(resolveWithinDist(DIST, '/../../etc/passwd')).toBeNull();
   });
 
-  // Chamada direta: por HTTP o `new URL` já teria removido os segmentos `..`,
-  // inclusive nesta forma percent-encoded. Aqui a contenção é quem barra.
-  it('recusa travessia percent-encoded', () => {
+  // Ponto encodado: `new URL` normaliza esta forma antes de chegar aqui, então
+  // por HTTP ela nunca alcança a função. Fica como teste da função em si.
+  it('recusa travessia com ponto percent-encoded', () => {
     expect(resolveWithinDist(DIST, '/%2e%2e/%2e%2e/etc/passwd')).toBeNull();
+  });
+
+  // BARRA encodada: este é o caso vivo. `new URL` NÃO normaliza `%2f` — a barra
+  // codificada impede a divisão em segmentos — então o pathname chega cru ao
+  // servidor e esta checagem é a ÚNICA coisa entre o request e /etc/passwd.
+  // Medido no container: 403 com a checagem, 200 servindo /etc/passwd sem ela.
+  it('recusa travessia com barra percent-encoded (%2f) — o caso que chega vivo', () => {
+    expect(resolveWithinDist(DIST, '/..%2f..%2f..%2f..%2fetc/passwd')).toBeNull();
+  });
+
+  it('recusa a mesma travessia com %2F maiúsculo', () => {
+    expect(resolveWithinDist(DIST, '/..%2F..%2F..%2F..%2Fetc/passwd')).toBeNull();
   });
 
   // Controle de prefixo: `startsWith(distDir)` sozinho deixaria passar um irmão
