@@ -75,6 +75,29 @@ testes passando**. `tooling/cgroup-cpus.ts` lê `/sys/fs/cgroup/cpu.max` (v2, co
 para `cpu.cfs_quota_us`/`cpu.cfs_period_us` do v1) e alimenta `maxWorkers` em
 `vitest.config.ts`.
 
+## Repo privado: o CI nasce morto sem estas variáveis
+
+Este template é um repositório **público**, onde o GitHub Actions em runner hospedado é
+gratuito e ilimitado — por isso o CI daqui está verde. O repo que você gera a partir dele
+é **privado**, e lá a cota de minutos hospedados está esgotada. Antes do primeiro push,
+defina duas _repository variables_ (Settings → Secrets and variables → Actions →
+Variables):
+
+| Variável           | Valor                              |
+| ------------------ | ---------------------------------- |
+| `CI_RUNNER`        | `["self-hosted","desenrolai"]`     |
+| `CI_RUNNER_DOCKER` | `["self-hosted","docker-builder"]` |
+
+O `runs-on` lê essas variáveis e cai em `ubuntu-latest` quando elas não existem — é o que
+mantém o CI deste template rodando em runner hospedado. O `fromJSON` não é enfeite: um
+runner self-hosted da casa é um **conjunto de labels**, e `self-hosted,desenrolai` como
+string simples viraria um único label com vírgula no nome, que não casa com runner nenhum.
+
+> ⚠️ **O sintoma de não fazer isto não parece falta de runner.** O job morre em ~2
+> segundos com **`steps: 0`** — nenhum step aparece, nenhum log de erro, nada que aponte
+> para billing. Parece YAML quebrado, e a pessoa perde meia hora procurando erro de
+> sintaxe. É cota.
+
 ## Deploy
 
 Imagem multi-stage sobre `node:24-alpine`, rodando como **uid 1001** e compatível com
@@ -84,3 +107,6 @@ Imagem multi-stage sobre `node:24-alpine`, rodando como **uid 1001** e compatív
 ```
 ghcr.io/desenrolai/<nome-do-repo>:main
 ```
+
+Em **pull request** a imagem é construída e descartada — sem login no GHCR e sem
+`packages: write`. É o que impede um `Dockerfile` quebrado de atravessar o PR verde.
