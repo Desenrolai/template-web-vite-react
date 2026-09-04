@@ -1,0 +1,7 @@
+dist/
+coverage/
+node_modules/
+package-lock.json
+
+# Contrato do Forge — formato preservado como o IDP o escreve.
+forge.yaml
