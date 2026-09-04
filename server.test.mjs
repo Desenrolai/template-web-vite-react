@@ -6,6 +6,18 @@ import { contentTypeFor, resolveWithinDist } from './server.mjs';
 
 const DIST = path.resolve('/srv/app/dist');
 
+/*
+ * Reproduzindo à mão contra o container, use SEMPRE `curl --path-as-is`:
+ *
+ *   curl -i --path-as-is "http://localhost:8080/..%2f..%2f..%2f..%2fetc/passwd"   -> 403
+ *   curl -i --path-as-is "http://localhost:8080/../../etc/passwd"                 -> 200 (SPA)
+ *
+ * Sem a flag o curl normaliza `../` DO LADO DO CLIENTE e envia `GET /etc/passwd`
+ * na linha do request — o servidor nunca vê a travessia e o teste dá falso
+ * negativo. Medido: com `%2f` o curl envia intacto e o resultado é o mesmo com
+ * ou sem a flag, mas não vale depender de qual forma você está testando.
+ */
+
 describe('resolveWithinDist', () => {
   it('resolve um arquivo comum dentro do dist', () => {
     expect(resolveWithinDist(DIST, '/assets/app.js')).toBe(path.join(DIST, 'assets', 'app.js'));

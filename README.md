@@ -53,6 +53,15 @@ enxerga `..` para remover e o caminho chega inteiro ao resolvedor. Nesse caso o
 `decodeURIComponent` + `path.resolve` + comparação de prefixo é a **única** linha de defesa
 contra um ataque que chega vivo por HTTP.
 
+Reproduzindo à mão, use **sempre `curl --path-as-is`**. Sem a flag o curl normaliza `../`
+do lado do cliente e envia `GET /etc/passwd` na linha do request — o servidor nunca vê a
+travessia e o teste dá falso negativo (com `%2f` o curl envia intacto, mas não vale
+depender de qual forma você está testando):
+
+```bash
+curl -i --path-as-is "http://localhost:8080/..%2f..%2f..%2f..%2fetc/passwd"   # 403
+```
+
 Provado nos dois sentidos: com a checagem, o request devolve **403**; com a comparação
 neutralizada para `true`, o mesmo request passou a devolver **200 com o conteúdo real de
 `/etc/passwd`**. `server.test.mjs` cobre as três formas (mais irmão de nome parecido,
